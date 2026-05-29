@@ -1,0 +1,10 @@
+ag2[ollama]>=0.8
+psycopg2-binary
+redis
+python-dotenv
+duckduckgo-search
+requests
+torch
+torchvision
+torchaudio
+docling

@@ -1,0 +1,9 @@
+.env
+.agent/session/
+__pycache__/
+*.pyc
+venv/
+.venv/
+workspace_run/
+*.log
+node_modules/

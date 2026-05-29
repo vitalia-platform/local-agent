@@ -1,0 +1,124 @@
+# vitalia-base/docker-compose.yml  em 2026-04-13 10:34
+services:
+  # Banco de Dados Principal com pgvector
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: ${DB_CONTAINER_NAME:-vitalia_db}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: "America/Cuiaba"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+      - ./scripts:/scripts
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis para Cache Semântico e Task Queue
+  redis:
+    image: "redis:alpine"
+    container_name: ${REDIS_CONTAINER_NAME:-vitalia_redis}
+    command: redis-server --requirepass ${REDIS_PASSWORD} --bind 0.0.0.0
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    restart: unless-stopped
+
+  # Motor de Inferência Ollama (GTX 1060 Optimized)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ${OLLAMA_CONTAINER_NAME:-vitalia_ollama}
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    restart: unless-stopped
+    environment:
+      - OLLAMA_HOST=0.0.0.0 # Expõe a API para a rede local (Notebook)
+      - OLLAMA_MAX_LOADED_MODELS=2
+      - OLLAMA_NUM_PARALLEL=2
+      - OLLAMA_KEEP_ALIVE=-1 # Mantém o modelo pinado na VRAM para evitar I/O no SSD SATA
+      - OLLAMA_FLASH_ATTENTION=0 # OBRIGATÓRIO: Desativa Flash Attention para a arquitetura Pascal (GTX 1060)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # Ingestão de Documentos (FastAPI)
+  ingester:
+    image: python:3.11-slim
+    container_name: ${INGESTER_CONTAINER_NAME:-vitalia_ingester}
+    restart: unless-stopped
+    ports:
+      - "9100:9099"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - OLLAMA_URL=http://ollama:11434
+    volumes:
+      - ./pipelines:/app/pipelines
+    working_dir: /app/pipelines
+    command: >
+      sh -c "pip install fastapi uvicorn requests psycopg2-binary python-multipart &&
+             uvicorn ingestion_api:app --host 0.0.0.0 --port 9099"
+    depends_on:
+      - db
+      - ollama
+
+  # Orquestrador de Lógica e Middleware de Compressão
+  pipelines:
+    image: ghcr.io/open-webui/pipelines:main
+    container_name: ${PIPELINES_CONTAINER_NAME:-vitalia_pipelines}
+    restart: unless-stopped
+    ports:
+      - "9099:9099"
+    environment:
+      - "OPEN_WEBUI_URL=http://open-webui:8080"
+      - "OLLAMA_BASE_URL=http://ollama:11434"
+    volumes:
+      - ./pipelines:/app/pipelines
+    depends_on:
+      - ollama
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Interface Open WebUI
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: ${WEBUI_CONTAINER_NAME:-vitalia_open_webui}
+    restart: unless-stopped
+    ports:
+      - "4000:8080"
+    volumes:
+      - /mnt/c/Users/André/Documents/Vitalia-RAG:/app/backend/data
+    environment:
+      # Conexão com o Banco de Dados Principal e Vetorial
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+      - VECTOR_DB=pgvector
+      - PGVECTOR_DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+      # Conexões de Inferência e RAG
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - WEBUI_AUTH=True
+      - ENABLE_RAG=True
+      - PIPELINES_URLS=http://pipelines:9099
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    depends_on:
+      - db
+      - ollama
+      - pipelines
+
+volumes:
+  postgres_data:
+  ollama_data:
+  open_webui_data:
