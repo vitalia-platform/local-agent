@@ -1,0 +1,322 @@
+# sources_config.yaml — Mapeamento de Colunas de Bases de Dados Acadêmicas
+# Versão base: 2026-05-19
+# Pesquisa: Clarivate (WoS), Elsevier (Scopus/EMBASE), NCBI (PubMed),
+#           EBSCO (CINAHL/PsycINFO), IEEE, ACM, Cochrane, ProQuest (ERIC), SciELO
+#
+# AVISO: Este arquivo é ponto de partida. Sempre verificar e atualizar
+# via workflow /integrative-review antes de usar em uma nova revisão.
+# Cada entrada possui 'official_docs' com a URL de referência para pesquisa ativa.
+
+sources:
+
+  # ─────────────────────────────────────────────────────────
+  # WEB OF SCIENCE (Clarivate)
+  # ─────────────────────────────────────────────────────────
+  wos_excel:
+    name: "Web of Science (Export Excel)"
+    description: >
+      Export direto pelo botão 'Export to Excel' no WoS Core Collection.
+      Usa nomes de colunas legíveis (não field tags de 2 caracteres).
+    official_docs: "https://images.webofknowledge.com/images/help/WOS/hs_wos_fieldtags.html"
+    last_verified: "2026-05-19"
+    verified_by: "pesquisa_web_antigravity"
+    delimiter: ","
+    encoding: "utf-8-sig"
+    columns:
+      title:    ["Article Title"]
+      abstract: ["Abstract"]
+      doi:      ["DOI"]
+      year:     ["Publication Year"]
+      journal:  ["Source Title"]
+      authors:  ["Authors"]
+      doc_type: ["Document Type"]
+      keywords: ["Author Keywords"]
+
+  wos_tabdelimited:
+    name: "Web of Science (Tab-delimited / Plain Text)"
+    description: >
+      Export via 'Other File Formats > Tab-delimited (Win, UTF-8)'.
+      Usa field tags de 2 caracteres (TI, AB, DI, PY, SO, AU, DT).
+      Recomendado para análise bibliométrica com bibliometrix ou pandas.
+    official_docs: "https://images.webofknowledge.com/images/help/WOS/hs_wos_fieldtags.html"
+    last_verified: "2026-05-19"
+    verified_by: "pesquisa_web_antigravity"
+    delimiter: "\t"
+    encoding: "utf-8"
+    columns:
+      title:    ["TI"]
+      abstract: ["AB"]
+      doi:      ["DI"]
+      year:     ["PY"]
+      journal:  ["SO"]
+      authors:  ["AU", "AF"]
+      doc_type: ["DT"]
+      keywords: ["DE", "ID"]
+
+  # ─────────────────────────────────────────────────────────
+  # SCOPUS (Elsevier)
+  # ─────────────────────────────────────────────────────────
+  scopus:
+    name: "Scopus (CSV Complete Format)"
+    description: >
+      Export CSV com todas as categorias selecionadas ('Citation information',
+      'Bibliographical information', 'Abstract and Keywords').
+      Encoding UTF-8 com BOM. Aspas duplas internas escapadas com duas aspas.
+      Limite: 2.000 registros por export — usar múltiplos arquivos para volumes maiores.
+    official_docs: "https://service.elsevier.com/app/answers/detail/a_id/14799/supporthub/scopus/"
+    last_verified: "2026-05-19"
+    verified_by: "pesquisa_web_antigravity"
+    delimiter: ","
+    encoding: "utf-8-sig"
+    columns:
+      title:    ["Document Title", "Title"]
+      abstract: ["Abstract"]
+      doi:      ["DOI"]
+      year:     ["Year", "Publication Year"]
+      journal:  ["Source title", "Source Title"]
+      authors:  ["Authors"]
+      doc_type: ["Document Type"]
+      keywords: ["Author Keywords", "Index Keywords"]
+      cited_by: ["Cited by"]
+      affiliations: ["Affiliations"]
+
+  # ─────────────────────────────────────────────────────────
+  # PUBMED / MEDLINE (NCBI)
+  # ─────────────────────────────────────────────────────────
+  pubmed_csv:
+    name: "PubMed (CSV nativo via 'Send to > File')"
+    description: >
+      ATENÇÃO: O export CSV nativo do PubMed NÃO inclui Abstract.
+      Para triagem de título+resumo, use pubmed_tabular ou acesse via
+      E-utilities API (efetch.fcgi?db=pubmed&rettype=abstract&retmode=text).
+      Este perfil mapeia apenas o que o CSV padrão disponibiliza.
+    official_docs: "https://www.ncbi.nlm.nih.gov/books/NBK3827/"
+    last_verified: "2026-05-19"
+    verified_by: "pesquisa_web_antigravity"
+    abstract_available: false
+    delimiter: ","
+    encoding: "utf-8"
+    columns:
+      title:    ["Title of article", "Title"]
+      abstract: []
+      doi:      ["DOI"]
+      year:     ["PubDate(Year)", "Publication Year"]
+      journal:  ["Journal"]
+      authors:  ["Authors", "Author"]
+      pmid:     ["UID", "PMID"]
+
+  pubmed_tabular:
+    name: "PubMed (Tabular com abstract — exportadores externos)"
+    description: >
+      Formato gerado por ferramentas que incluem abstract via E-utilities:
+      PubMed FLink, Zotero RIS export, NBCI Entrez Direct (xtract).
+      Usar quando abstract for essencial para triagem.
+    official_docs: "https://www.ncbi.nlm.nih.gov/books/NBK179288/"
+    last_verified: "2026-05-19"
+    verified_by: "pesquisa_web_antigravity"
+    delimiter: ","
+    encoding: "utf-8"
+    columns:
+      title:    ["Title", "Article Title", "title"]
+      abstract: ["Abstract", "Summary", "abstract"]
+      doi:      ["DOI", "doi"]
+      year:     ["Year", "Publication Year", "PubDate(Year)"]
+      journal:  ["Journal", "Source", "journal"]
+      authors:  ["Authors", "Author", "authors"]
+      pmid:     ["PMID", "UID", "pmid"]
+
+  # ─────────────────────────────────────────────────────────
+  # EMBASE (Elsevier)
+  # ─────────────────────────────────────────────────────────
+  embase:
+    name: "EMBASE (CSV — Fields by Column)"
+    description: >
+      Export 'CSV - Fields by Column' com 'Full Record' ou
+      'Citations and Abstracts' selecionado. Plataforma embase.com.
+      Limite: 10.000 registros para usuários registrados.
+    official_docs: "https://help.embase.com/embase/Content/Home.htm"
+    last_verified: "2026-05-19"
+    verified_by: "pesquisa_web_antigravity"
+    delimiter: ","
+    encoding: "utf-8"
+    columns:
+      title:    ["Title", "Article Title"]
+      abstract: ["Abstract"]
+      doi:      ["DOI"]
+      year:     ["Year", "Publication Year"]
+      journal:  ["Source", "Journal", "Source Title"]
+      authors:  ["Authors", "Author Names"]
+      doc_type: ["Document Type"]
+      keywords: ["Keywords", "EMTREE Drug Terms", "EMTREE Medical Terms"]
+
+  # ─────────────────────────────────────────────────────────
+  # CINAHL (EBSCO)
+  # ─────────────────────────────────────────────────────────
+  cinahl_ebsco:
+    name: "CINAHL / EBSCO (Tab-delimited)"
+    description: >
+      Export Tab-delimited do EBSCOhost. Selecionar 'Detailed citation'
+      para incluir o Abstract (campo AB). Adicionar resultados ao Folder
+      antes de exportar volumes grandes.
+    official_docs: "https://connect.ebsco.com/s/article/How-to-Export-Results-in-EBSCOhost"
+    last_verified: "2026-05-19"
+    verified_by: "pesquisa_web_antigravity"
+    delimiter: "\t"
+    encoding: "utf-8"
+    columns:
+      title:    ["TI", "Title"]
+      abstract: ["AB", "Abstract"]
+      doi:      ["DOI"]
+      year:     ["PY", "Publication Year"]
+      journal:  ["SO", "Source"]
+      authors:  ["AU", "Authors"]
+      doc_type: ["DT", "Document Type"]
+      keywords: ["DE", "MJ", "Subject Terms"]
+      accession: ["AN"]
+
+  # ─────────────────────────────────────────────────────────
+  # PsycINFO / APA (via Ovid ou EBSCO)
+  # ─────────────────────────────────────────────────────────
+  psycinfo_ovid:
+    name: "PsycINFO / Ovid (CSV)"
+    description: >
+      Export CSV via plataforma Ovid (APA). Incluir campo Abstract (AB)
+      explicitamente no export. Também disponível via EBSCO — neste caso
+      usar perfil cinahl_ebsco (mesmos field tags).
+    official_docs: "https://ospguides.ovid.com/OSPguides/medline.htm"
+    last_verified: "2026-05-19"
+    verified_by: "pesquisa_web_antigravity"
+    delimiter: ","
+    encoding: "utf-8"
+    columns:
+      title:    ["Title", "TI"]
+      abstract: ["Abstract", "AB"]
+      doi:      ["DOI", "DO"]
+      year:     ["Publication Year", "PY", "Year"]
+      journal:  ["Source", "SO", "Publication Title"]
+      authors:  ["Author", "AU", "Authors"]
+      doc_type: ["Document Type", "DT"]
+      keywords: ["Subject Headings", "SH", "Keywords"]
+
+  # ─────────────────────────────────────────────────────────
+  # IEEE XPLORE
+  # ─────────────────────────────────────────────────────────
+  ieee_xplore:
+    name: "IEEE Xplore (CSV)"
+    description: >
+      Export CSV do IEEE Xplore. Headers variam por tipo de documento
+      (journal vs conference paper vs standard). Abstract geralmente incluído.
+      Para revisões sistemáticas, preferir RIS para maior compatibilidade.
+    official_docs: "https://ieeexplore.ieee.org/Xplorehelp/searching-ieee-xplore/search-results-page"
+    last_verified: "2026-05-19"
+    verified_by: "pesquisa_web_antigravity"
+    delimiter: ","
+    encoding: "utf-8"
+    columns:
+      title:    ["Document Title", "Title"]
+      abstract: ["Abstract"]
+      doi:      ["DOI"]
+      year:     ["Publication Year", "Year", "Date"]
+      journal:  ["Publication Title", "Journal", "Conference Name"]
+      authors:  ["Authors"]
+      doc_type: ["Document Identifier", "Content Type"]
+      keywords: ["Author Keywords", "IEEE Terms", "Mesh_Terms"]
+
+  # ─────────────────────────────────────────────────────────
+  # ACM DIGITAL LIBRARY
+  # ─────────────────────────────────────────────────────────
+  acm_dl:
+    name: "ACM Digital Library (BibTeX/RIS convertido para CSV)"
+    description: >
+      ACM não exporta CSV diretamente. Fluxo recomendado:
+      1. Exportar BibTeX ou RIS
+      2. Importar no Zotero (com Connector para capturar abstract)
+      3. Exportar como CSV do Zotero
+      Abstract pode estar ausente no export nativo sem o Connector.
+    official_docs: "https://dl.acm.org/about/content"
+    last_verified: "2026-05-19"
+    verified_by: "pesquisa_web_antigravity"
+    delimiter: ","
+    encoding: "utf-8"
+    columns:
+      title:    ["title", "Title"]
+      abstract: ["abstract", "Abstract"]
+      doi:      ["doi", "DOI"]
+      year:     ["year", "Year", "publication-year", "Publication Year"]
+      journal:  ["journal", "booktitle", "Source", "Publication Title"]
+      authors:  ["author", "Authors", "Author"]
+      doc_type: ["type", "ENTRYTYPE", "Item Type"]
+      keywords: ["keywords", "Keywords"]
+
+  # ─────────────────────────────────────────────────────────
+  # COCHRANE LIBRARY / CENTRAL
+  # ─────────────────────────────────────────────────────────
+  cochrane_central:
+    name: "Cochrane Library / CENTRAL (CSV)"
+    description: >
+      Export CSV via 'Export selected citations > CSV (Excel)' no
+      Cochrane Library. Abrir no Excel via Data > From Text/CSV com
+      UTF-8 para evitar problemas com caracteres especiais.
+    official_docs: "https://www.cochranelibrary.com/help/exporting-search-results"
+    last_verified: "2026-05-19"
+    verified_by: "pesquisa_web_antigravity"
+    delimiter: ","
+    encoding: "utf-8"
+    columns:
+      title:    ["Title", "Record Title"]
+      abstract: ["Abstract"]
+      doi:      ["DOI"]
+      year:     ["Publication Year", "Year"]
+      journal:  ["Source", "Journal", "Cochrane Database"]
+      authors:  ["Authors", "Author(s)"]
+      doc_type: ["Record Type", "Type"]
+
+  # ─────────────────────────────────────────────────────────
+  # ERIC (ProQuest)
+  # ─────────────────────────────────────────────────────────
+  eric_proquest:
+    name: "ERIC / ProQuest (CSV)"
+    description: >
+      Export CSV do ProQuest/ERIC. Selecionar 'Include Abstracts' e
+      'Detailed citation' para incluir o campo Abstract.
+      Limite: 10.000 registros via 'My Research' account.
+    official_docs: "https://eric.ed.gov/?q=&ft=on"
+    last_verified: "2026-05-19"
+    verified_by: "pesquisa_web_antigravity"
+    delimiter: ","
+    encoding: "utf-8"
+    columns:
+      title:    ["Title", "Article Title"]
+      abstract: ["Abstract"]
+      doi:      ["DOI"]
+      year:     ["Publication Date", "Year", "Publication Year"]
+      journal:  ["Publication Title", "Journal", "Source"]
+      authors:  ["Author", "Authors"]
+      doc_type: ["Document Type", "Type"]
+      keywords: ["Subject", "Descriptors"]
+
+  # ─────────────────────────────────────────────────────────
+  # SciELO
+  # ─────────────────────────────────────────────────────────
+  scielo:
+    name: "SciELO (RIS convertido para CSV via Zotero)"
+    description: >
+      SciELO não tem export CSV direto robusto. Fluxo recomendado:
+      1. Exportar RIS do SciELO
+      2. Importar no Zotero
+      3. Exportar como CSV do Zotero
+      Este perfil mapeia o CSV gerado pelo Zotero a partir do RIS do SciELO.
+    official_docs: "https://scielo.org/en/about-scielo/scielo-procedures-and-guidelines/"
+    last_verified: "2026-05-19"
+    verified_by: "pesquisa_web_antigravity"
+    delimiter: ","
+    encoding: "utf-8"
+    columns:
+      title:    ["Title", "title"]
+      abstract: ["Abstract", "abstract"]
+      doi:      ["DOI", "doi"]
+      year:     ["Publication Year", "year"]
+      journal:  ["Publication Title", "Source", "journal"]
+      authors:  ["Author", "author", "Authors"]
+      doc_type: ["Type", "Item Type"]
+      keywords: ["Manual Tags", "Keywords"]
