@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Script de Instalação do Kit de Agentes
+# Script de Instalação do Agency
 # Inicializa o kit no diretório alvo através de symlinks e prepara o controle de sessão.
 
 set -e
 
 # Descobrir diretório do kit
-KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)"
+AGENCY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)"
 TARGET_DIR="${PWD}"
 
 AGENT_DIR="${TARGET_DIR}/.agent"
 SESSION_DIR="${AGENT_DIR}/session"
 
-echo "🚀 Iniciando instalação do Kit de Agentes no projeto: $(basename "${TARGET_DIR}")"
+echo "🚀 Iniciando instalação do Agency no projeto: $(basename "${TARGET_DIR}")"
 
 # Verifica se a pasta .agent já existe
 if [ -d "$AGENT_DIR" ]; then
@@ -23,11 +23,11 @@ echo "📦 Criando infraestrutura .agent..."
 mkdir -p "$AGENT_DIR"
 
 for item in agents rules skills workflows templates scripts; do
-    if [ -d "$KIT_DIR/$item" ]; then
+    if [ -d "$AGENCY_DIR/$item" ]; then
         # Remove symlink/pasta antiga se existir para forçar recriação
         rm -rf "$AGENT_DIR/$item"
-        ln -s "$KIT_DIR/$item" "$AGENT_DIR/$item"
-        echo "   🔗 Symlink atualizado: $item -> $KIT_DIR/$item"
+        ln -s "$AGENCY_DIR/$item" "$AGENT_DIR/$item"
+        echo "   🔗 Symlink atualizado: $item -> $AGENCY_DIR/$item"
     fi
 done
 
@@ -39,7 +39,7 @@ if [ ! -d "$SESSION_DIR/.git" ]; then
     echo "   (Informe 's' mesmo que o repositório esteja vazio — ele será inicializado automaticamente)"
     read -p "> " choice
     if [ "$choice" == "s" ] || [ "$choice" == "S" ]; then
-        read -p "URL do repositório (git@github.com:...): " repo_url
+        repo_url="git@github.com:vitalia-platform/local-agent-context.git"
         if [ -n "$repo_url" ]; then
             # NÃO cria a pasta antes: o git clone precisa que o destino não exista
             rm -rf "$SESSION_DIR"
@@ -113,13 +113,13 @@ fi
 
 # Registro de Identidade da Máquina
 echo "🆔 Registrando identidade desta máquina..."
-MACHINE_ID=$(python3 "$KIT_DIR/scripts/lib_machine.py" --get-id)
-python3 "$KIT_DIR/scripts/lib_machine.py" --register "$SESSION_DIR" "$MACHINE_ID" "$(hostname)"
+MACHINE_ID=$(python3 "$AGENCY_DIR/scripts/lib_machine.py" --get-id)
+python3 "$AGENCY_DIR/scripts/lib_machine.py" --register "$SESSION_DIR" "$MACHINE_ID" "$(hostname)"
 echo "   ✅ Máquina registrada como: $(hostname) ($MACHINE_ID)"
 
 # Invocando validação final
 echo "🔍 Rodando validação final..."
-python3 "$KIT_DIR/scripts/validate-kit.py" --target "$TARGET_DIR"
+python3 "$AGENCY_DIR/scripts/validate-kit.py" --target "$TARGET_DIR"
 
 echo ""
 echo "🎉 Instalação concluída com sucesso!"
