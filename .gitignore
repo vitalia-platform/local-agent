@@ -8,3 +8,4 @@ venv/
 workspace_run/
 *.log
 node_modules/
+logs/

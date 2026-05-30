@@ -17,3 +17,19 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
+
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: vitalia_db_local
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - vitalia_local_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  vitalia_local_data:

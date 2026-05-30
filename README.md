@@ -50,48 +50,22 @@ REDE LOCAL / VPN
 
 ## 3. Setup do NÓ 2 (Servidor)
 
+A infraestrutura do Servidor agora é provisionada quase que integralmente por um único script, que orquestra a inicialização do Docker, o download pesado de modelos no Ollama e a injeção do banco de dados (schema do RAG).
+
 1. Clone o repositório dentro do WSL2:
    ```bash
    git clone git@github.com:vitalia-platform/local-agent.git
    cd local-agent
    ```
 
-2. Crie e configure o `.env`:
+2. Execute o Script Automático de Instalação:
+   O script configurará seu `.env`, lerá o IP local e o **sincronizará magicamente** através do nosso repositório de sessão isolado (`.agent/session`), além de inicializar todo o ecossistema de Inteligência Artificial:
    ```bash
-   cp .env.example .env
-   # Edite o .env e insira senhas seguras para o PostgreSQL e Redis.
+   bash scripts/setup_server.sh
    ```
 
-3. Suba os serviços principais:
-   ```bash
-   docker compose up -d
-   ```
-
-4. Habilite o pgvector:
-   ```bash
-   sleep 10
-   docker exec vitalia_db psql -U vitalia_admin -d vitalia_db -c "CREATE EXTENSION IF NOT EXISTS vector;"
-   ```
-
-5. Baixe os modelos no Ollama:
-   ```bash
-   docker exec vitalia_ollama ollama pull qwen2.5-coder:7b
-   docker exec vitalia_ollama ollama pull nomic-embed-text
-   
-   # Crie o modelo customizado para a GTX 1060 (Sem Flash Attention e num_ctx=8192)
-   docker cp Modelfile.qwen vitalia_ollama:/tmp/Modelfile.qwen
-   docker exec vitalia_ollama ollama create qwen2.5-coder-vitalia -f /tmp/Modelfile.qwen
-   ```
-
-6. Inicie a API de Telemetria e Sync:
-   ```bash
-   cd telemetry_api
-   pip install -r requirements.txt
-   python telemetry_api.py &
-   ```
-
-7. **Configuração de Rede (Crucial):**
-   Como o IP do WSL muda a cada reinício, execute o script do port proxy como **Administrador no PowerShell do Windows Server**:
+3. **Configuração de Rede (Crucial):**
+   Como o IP do WSL muda a cada reinício, execute o script do port proxy como **Administrador no PowerShell do Windows Server** (para que o notebook consiga alcançar a porta do Ollama):
    ```powershell
    powershell -ExecutionPolicy Bypass -File scripts/wsl-port-proxy.ps1
    ```
@@ -100,53 +74,18 @@ REDE LOCAL / VPN
 
 ## 4. Setup do NÓ 1 (Notebook)
 
+O notebook consumirá a sessão que o servidor acabou de "publicar" no `.agent/session`, auto-configurando sua conexão de rede de forma totalmente invisível.
+
 1. Clone o mesmo repositório dentro do WSL2 do notebook:
    ```bash
    git clone git@github.com:vitalia-platform/local-agent.git
    cd local-agent
    ```
 
-2. Inicie e estruture a Agency local:
-   O comando abaixo irá formatar a pasta `.agent` criando os symlinks para os agentes e inicializando o repositório git aninhado de sessão (`.agent/session`). Responda com "s" para configurar o repositório remoto caso seja perguntado.
+2. Execute o Script Automático de Instalação:
+   Ele baixará os dados da sessão via pull, preencherá o `NO2_SERVER_IP` no seu `.env` automaticamente, e instalará as dependências globais de Python (como PyTorch otimizado para CUDA) e o OpenHands.
    ```bash
-   bash agency/scripts/install.sh
-   ```
-
-3. Configure o `.env`:
-   ```bash
-   cp .env.example .env
-   # Edite o .env, preenchendo as MESMAS SENHAS criadas no servidor e apontando o IP:
-   # NO2_SERVER_IP=192.168.0.254
-   ```
-
-4. Suba o ambiente OpenHands (Sandbox):
-   ```bash
-   docker compose -f docker-compose.notebook.yml up -d
-   ```
-
-5. Configure o ambiente Python do Orquestrador:
-   ```bash
-   cd orchestrator
-   python3 -m venv .venv
-   source .venv/bin/activate
-   
-   # PyTorch com CUDA 12.8 (Compatível com driver 12.9)
-   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
-   pip install -r requirements.txt
-   ```
-
-6. Suba o banco de dados pgvector local (para RAG descentralizado):
-   ```bash
-   source ../.env
-   docker run -d --name vitalia_db_local \
-     -p 5432:5432 \
-     -e POSTGRES_DB=${POSTGRES_DB} \
-     -e POSTGRES_USER=${POSTGRES_USER} \
-     -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
-     -v vitalia_local_data:/var/lib/postgresql/data \
-     pgvector/pgvector:pg16
-
-   docker exec vitalia_db_local psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c "CREATE EXTENSION IF NOT EXISTS vector;"
+   bash scripts/setup_notebook.sh
    ```
 
 ---
@@ -161,13 +100,17 @@ Pode ser acessado de qualquer lugar da rede pela porta `4000`:
 - Crie a primeira conta (que será o Admin) e selecione o modelo `qwen2.5-coder-vitalia`.
 
 ### 5.2 Agentic IDE via OpenHands + AG2 (Notebook)
-No notebook, você possui a suíte completa de orquestração.
+No notebook, você possui a suíte completa de orquestração e monitoramento.
 - **Acesse o OpenHands:** `http://localhost:3000` (Esta interface usará o Ollama remoto configurado).
-- **Inicie o Orquestrador:**
+- **Acompanhe os Serviços Locais (Dashboard):**
   ```bash
-  cd orchestrator
   source .venv/bin/activate
-  python orchestrator.py "Execute uma varredura de telemetria no servidor."
+  python scripts/runner.py --node notebook
+  ```
+- **Inicie o Orquestrador Manualmente:**
+  ```bash
+  source .venv/bin/activate
+  python orchestrator/orchestrator.py "Execute uma varredura de telemetria no servidor."
   ```
 
 ---

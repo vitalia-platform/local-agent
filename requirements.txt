@@ -8,3 +8,6 @@ torch
 torchvision
 torchaudio
 docling
+fastapi
+uvicorn
+rich
