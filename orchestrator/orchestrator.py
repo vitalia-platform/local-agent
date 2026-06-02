@@ -1,8 +1,9 @@
 # orchestrator.py
 # Criado em: 29-05-2026 14:52:00(GMT-04:00)
-# Caminho: /home/andre/projetos/assistidos/servidor-ia/orchestrator.py
+# Caminho: /home/andre/projetos/assistidos/servidor-ia/orchestrator/orchestrator.py
 
 import os
+import sys
 import json
 import logging
 import requests
@@ -27,91 +28,118 @@ NO1_LOCAL_OLLAMA_URL = os.getenv("NO1_LOCAL_OLLAMA_URL", "http://localhost:11434
 from tools import save_to_rag, update_sprint_state, web_search
 
 # -------------------------------------------------------------
-# CONFIGURAÇÃO DE LLM POR NÓ (ROTEAMENTO INTELIGENTE)
+# CONFIGURAÇÃO MULTI-LLM E FALLBACK
 # -------------------------------------------------------------
 
-# Lead Engineer / Raciocínio Pesado (Servidor - GTX 1060 6GB)
-# Aceita qwen2.5-coder:7b ou deepseek-r1-distill-qwen-7b
-llm_config_server = {
-    "config_list": [
-        {
-            "model": "qwen2.5-coder-vitalia",
-            "client_host": f"http://{NO2_SERVER_IP}:{NO2_OLLAMA_PORT}",
-            "api_type": "ollama",
+def load_agent_config(profile_env_var: str, default_profile: str) -> dict:
+    """
+    Lê o perfil do .env (ex: ROUTER_LLM_PROFILE) e retorna o llm_config correto.
+    Em caso de falha de credencial, faz graceful exit com mensagem amigável no terminal.
+    """
+    profile = os.getenv(profile_env_var, default_profile).strip().lower()
+    
+    if profile == "ollama_server":
+        return {
+            "config_list": [{"model": "qwen2.5-coder-vitalia", "client_host": f"http://{NO2_SERVER_IP}:{NO2_OLLAMA_PORT}", "api_type": "ollama"}],
+            "temperature": 0.2, "cache_seed": None
         }
-    ],
-    "temperature": 0.2,
-    "cache_seed": None,  # Desativa o cache local para garantir execução de testes limpos
-}
+    elif profile == "ollama_local":
+        return {
+            "config_list": [{"model": "qwen2:1.5b", "client_host": NO1_LOCAL_OLLAMA_URL, "api_type": "ollama"}],
+            "temperature": 0.1, "cache_seed": None
+        }
+    elif profile == "gemini":
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            logger.error(f"❌ ERRO CRÍTICO: Perfil '{profile}' escolhido para {profile_env_var}, mas GEMINI_API_KEY está vazio no .env.")
+            sys.exit(1)
+        return {
+            "config_list": [{"model": "gemini-1.5-pro", "api_key": api_key, "api_type": "google"}],
+            "temperature": 0.2, "cache_seed": None
+        }
+    elif profile == "claude":
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            logger.error(f"❌ ERRO CRÍTICO: Perfil '{profile}' escolhido para {profile_env_var}, mas ANTHROPIC_API_KEY está vazio no .env.")
+            sys.exit(1)
+        return {
+            "config_list": [{"model": "claude-3-5-sonnet-20241022", "api_key": api_key, "api_type": "anthropic"}],
+            "temperature": 0.2, "cache_seed": None
+        }
+    elif profile == "openai":
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            logger.error(f"❌ ERRO CRÍTICO: Perfil '{profile}' escolhido para {profile_env_var}, mas OPENAI_API_KEY está vazio no .env.")
+            sys.exit(1)
+        return {
+            "config_list": [{"model": "gpt-4o", "api_key": api_key}],
+            "temperature": 0.2, "cache_seed": None
+        }
+    else:
+        logger.error(f"❌ ERRO CRÍTICO: Perfil '{profile}' desconhecido para {profile_env_var}.")
+        sys.exit(1)
 
-# Linter / Triagem / Telemetria (Notebook - MX450 2GB CPU/GPU)
-llm_config_local = {
-    "config_list": [
-        {
-            "model": "qwen2:1.5b",
-            "client_host": NO1_LOCAL_OLLAMA_URL,
-            "api_type": "ollama",
-        }
-    ],
-    "temperature": 0.1,
-    "cache_seed": None,
-}
+llm_config_triage = load_agent_config("ROUTER_LLM_PROFILE", "gemini")
+llm_config_server = load_agent_config("DEVELOPER_LLM_PROFILE", "ollama_server")
+llm_config_local = load_agent_config("INFRA_LLM_PROFILE", "ollama_local")
 
 # -------------------------------------------------------------
 # CRIAÇÃO DOS AGENTES DO AUTOGEN
 # -------------------------------------------------------------
 
-# 1. Agente Desenvolvedor (GTX 1060)
+triage = AssistantAgent(
+    name="Triage_Agent",
+    llm_config=llm_config_triage,
+    description="Agente principal de roteamento. O primeiro a receber o pedido do usuário para decidir a intenção.",
+    system_message="""Você é o Triage Agent da Vitalia. Seu único objetivo é analisar o pedido do usuário e repassar para o agente correto.
+Regras de Roteamento:
+1. Problemas de lentidão, queda de recursos, verificações de telemetria ou hardware: repasse para o Infrastructure_Agent.
+2. Criação de código, buscas na web ou funcionalidades: repasse para o Developer_Agent.
+Apenas declare para quem você está direcionando a tarefa e por quê."""
+)
+
 developer = AssistantAgent(
     name="Developer_Agent",
     llm_config=llm_config_server,
+    description="Especialista em software. Acione APENAS para resolver problemas de código, criar arquivos ou realizar buscas na web.",
     system_message="""Você é o Lead Developer da Vitalia, operando sob a nossa Constituição de Eficiência.
-Seu motor executa em uma GTX 1060 (limite rígido de 8k tokens de contexto).
 Regras de ouro:
-1. Seja extremamente conciso. NUNCA reescreva arquivos inteiros se puder retornar apenas a função ou bloco modificado.
-2. Sempre que criar ou refatorar lógica de código, execute a ferramenta `save_to_rag` para registrar a assinatura das funções e arquivos.
-3. Se o histórico de conversas estiver muito longo, solicite um resumo ao Agente de Infraestrutura para economizar sua VRAM.
-4. Responda apenas com o código modificado ou instruções diretas. Evite explicações textuais redundantes.
-""",
+1. NUNCA reescreva arquivos inteiros se puder retornar apenas a função ou bloco modificado.
+2. A ferramenta `save_to_rag` deve ser acionada APENAS quando você considerar que uma funcionalidade completa (ou arquivo inteiro) foi concluída e testada.
+3. Use a ferramenta `web_search` DEPOIS do RAG, levando o contexto dele para otimizar sua busca na web. Inicialmente nenhuma tarefa é proibida, vasculhe a web na busca de boas práticas.
+"""
 )
 
-# 2. Agente de Infraestrutura & Telemetria (Ollama Local)
 infra = AssistantAgent(
     name="Infrastructure_Agent",
     llm_config=llm_config_local,
-    system_message="""Você é o Guardião de Recursos da Vitalia. Seu trabalho é monitorar a integridade das GPUs (MX450 local e GTX 1060 remota).
-Suas diretrizes:
-1. Use a ferramenta `get_node2_telemetry` periodicamente para avaliar o uso de VRAM no Servidor.
-2. Se a VRAM do servidor estiver acima de 5500MB, avise imediatamente a equipe para forçar um checkpoint e descarregar contextos.
-3. Gerencie as sprints. Sempre que uma fase relevante for concluída ou um checkpoint for necessário, consolide as informações e chame a ferramenta `update_sprint_state` salvando no Redis e no Git de sessão.
-4. Ajude o desenvolvedor a manter o foco em tarefas menores para economizar seu contexto de 8k tokens.
-""",
+    description="Especialista em infraestrutura. Acione APENAS para monitorar telemetria, hardware e atualizar o estado da sprint.",
+    system_message="""Você é o Guardião de Recursos da Vitalia.
+Regras de ouro:
+1. Use `get_node2_telemetry` periodicamente ou sob demanda, especialmente quando o Triage_Agent relatar problemas de lentidão ou solicitar varredura.
+2. Use `update_sprint_state` a CADA TURNO para garantir o sincronismo do estado.
+3. Se a VRAM do servidor estiver acima de 5500MB, avise imediatamente a equipe.
+"""
 )
 
-# 3. User Proxy (Notebook - Executa as ferramentas fisicamente)
 user_proxy = UserProxyAgent(
     name="User_Proxy",
-    human_input_mode="NEVER",  # Roda de forma autônoma/semi-autônoma respondendo automaticamente
+    human_input_mode="NEVER",
     max_consecutive_auto_reply=10,
     is_termination_msg=lambda x: x.get("content", "").strip().endswith("TERMINAR"),
-    code_execution_config={
-        "work_dir": "workspace_run",
-        "use_docker": False,  # OpenHands já executa dentro de um sandbox seguro
-    },
+    code_execution_config={"work_dir": "workspace_run", "use_docker": False},
 )
 
 # -------------------------------------------------------------
 # SHIELD ANTI-OOM (COMPRESSÃO DE CONTEXTO DINÂMICA)
 # -------------------------------------------------------------
-# Garante que o payload enviado para o Servidor nunca exceda 6000 tokens.
 token_limiter = MessageTokenLimiter(max_tokens=6000, model="gpt-3.5-turbo")
 context_transformer = transform_messages.TransformMessages(transforms=[token_limiter])
 context_transformer.add_to_agent(developer)
-
 logger.info("Capacidade de compressão de contexto TransformMessages acoplada ao Developer Agent.")
 
 # -------------------------------------------------------------
-# REGISTRO DE TOOLS
+# REGISTRO DE TOOLS E DESCRIÇÕES MELHORADAS
 # -------------------------------------------------------------
 
 def get_node2_telemetry() -> str:
@@ -125,40 +153,43 @@ def get_node2_telemetry() -> str:
         return f"Erro ao acessar API de Telemetria no Servidor ({NO2_SERVER_IP}): {str(e)}"
     return "Status desconhecido."
 
-# Registra save_to_rag
 autogen.register_function(
     save_to_rag,
     caller=developer,
     executor=user_proxy,
     name="save_to_rag",
-    description="Salva arquivos de código (via AST) ou PDFs (via Docling local na GPU MX450) no pgvector local e retransmite para o servidor."
+    description="MANDATÓRIO: Salva código/arquivos no banco vetorial. USE APENAS quando considerar que uma funcionalidade completa (ou arquivo inteiro) foi concluído e testado. Não use para modificações triviais em andamento."
 )
 
-# Registra update_sprint_state
 autogen.register_function(
     update_sprint_state,
     caller=infra,
     executor=user_proxy,
     name="update_sprint_state",
-    description="Grava o estado atual da sprint em JSON no Redis e cria o arquivo de log Markdown em .agent/session/sprint_atual.md."
+    description="MANDATÓRIO: Grava o estado atual da sprint. Execute esta ferramenta A CADA TURNO para garantir a consistência do acompanhamento do projeto."
 )
 
-# Registra web_search
 autogen.register_function(
     web_search,
     caller=developer,
     executor=user_proxy,
     name="web_search",
-    description="Executa uma busca na web rápida e gratuita via DuckDuckGo Search."
+    description="Executa busca na web. Use apenas DEPOIS de esgotar o RAG, levando o contexto para buscar boas práticas. Não acione repetitivamente a mesma busca."
 )
 
-# Registra get_node2_telemetry
 autogen.register_function(
     get_node2_telemetry,
     caller=infra,
     executor=user_proxy,
     name="get_node2_telemetry",
-    description="Consulta o status de hardware em tempo real da GTX 1060 (VRAM) e RAM do Servidor (Nó 2)."
+    description="MANDATÓRIO: Consulta hardware. Use sempre que o usuário ou Triage reportarem lentidão, queda de recursos ou solicitarem varredura. Rode periodicamente."
+)
+autogen.register_function(
+    get_node2_telemetry,
+    caller=developer,
+    executor=user_proxy,
+    name="get_node2_telemetry",
+    description="Consulta hardware (VRAM). Acione se precisar confirmar disponibilidade de recursos no servidor antes de gerar código muito pesado."
 )
 
 # -------------------------------------------------------------
@@ -166,17 +197,17 @@ autogen.register_function(
 # -------------------------------------------------------------
 
 def run_orchestration(user_prompt: str):
-    """Dispara a conversa de grupo entre o Desenvolvedor, o Infra e o Usuário."""
-    logger.info("Instanciando chat de grupo de agentes...")
+    logger.info("Instanciando chat de grupo de agentes (Swarm/Triage mode)...")
     
     groupchat = autogen.GroupChat(
-        agents=[user_proxy, developer, infra],
+        agents=[user_proxy, triage, developer, infra],
         messages=[],
         max_round=12,
-        speaker_selection_method="auto"  # AG2 gerencia dinamicamente o fluxo de conversa
+        speaker_selection_method="auto"
     )
     
-    manager = autogen.GroupChatManager(groupchat=groupchat, llm_config=llm_config_local)
+    # Manager agora usa a inteligência do Triage/Router (ex: Gemini) para decidir com precisão
+    manager = autogen.GroupChatManager(groupchat=groupchat, llm_config=llm_config_triage)
     
     logger.info(f"Disparando prompt inicial: {user_prompt}")
     user_proxy.initiate_chat(
@@ -185,7 +216,6 @@ def run_orchestration(user_prompt: str):
     )
 
 if __name__ == "__main__":
-    # Exemplo de teste rápido do orquestrador
     import sys
     prompt = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else "Verifique o status da telemetria do servidor e reporte a disponibilidade de VRAM."
     run_orchestration(prompt)
