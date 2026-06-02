@@ -22,8 +22,8 @@ fi
 echo "📦 Criando infraestrutura .agent..."
 mkdir -p "$AGENT_DIR"
 
-for item in agents rules skills workflows templates scripts; do
-    if [ -d "$AGENCY_DIR/$item" ]; then
+for item in agents rules skills workflows templates scripts README.md MANIFEST.md MANUAL.md; do
+    if [ -e "$AGENCY_DIR/$item" ]; then
         # Remove symlink/pasta antiga se existir para forçar recriação
         rm -rf "$AGENT_DIR/$item"
         ln -s "$AGENCY_DIR/$item" "$AGENT_DIR/$item"
@@ -52,6 +52,8 @@ if [ ! -d "$SESSION_DIR/.git" ]; then
                     cd "$SESSION_DIR"
                     git checkout -b main 2>/dev/null || git checkout main 2>/dev/null || true
                     echo "# Contexto de Sessão" > CONTEXT.md
+                    echo "" >> CONTEXT.md
+                    echo "> **INSTRUÇÃO PRIMÁRIA (TIER 0)**: Ao ler este contexto, o agente deve, imediatamente e antes de agir, ler os arquivos \`.agent/README.md\` (para carregar a estrutura do kit), \`.agent/MANIFEST.md\` (para catálogo de skills) e, criticamente, \`.agent/rules/always-on/architect-constitution.md\` para carregar as 21 regras absolutas (especialmente a P4 de selo de tempo)." >> CONTEXT.md
                     echo "Estado atual da revisão integrativa, gerenciado pelo agente de IA." >> CONTEXT.md
                     echo "" >> CONTEXT.md
                     echo "_Gerado automaticamente em $(date '+%Y-%m-%d')._ " >> CONTEXT.md
@@ -69,6 +71,8 @@ if [ ! -d "$SESSION_DIR/.git" ]; then
                 git init > /dev/null
                 git checkout -b main 2>/dev/null || true
                 echo "# Contexto de Sessão" > CONTEXT.md
+                echo "" >> CONTEXT.md
+                echo "> **INSTRUÇÃO PRIMÁRIA (TIER 0)**: Ao ler este contexto, o agente deve, imediatamente e antes de agir, ler os arquivos \`.agent/README.md\` (para carregar a estrutura do kit), \`.agent/MANIFEST.md\` (para catálogo de skills) e, criticamente, \`.agent/rules/always-on/architect-constitution.md\` para carregar as 21 regras absolutas (especialmente a P4 de selo de tempo)." >> CONTEXT.md
                 git add . > /dev/null
                 git commit -m "chore: local session fallback" > /dev/null
                 cd "$TARGET_DIR"
@@ -87,6 +91,8 @@ if [ ! -d "$SESSION_DIR/.git" ]; then
         git init > /dev/null
         git checkout -b main 2>/dev/null || true
         echo "# Contexto de Sessão" > CONTEXT.md
+        echo "" >> CONTEXT.md
+        echo "> **INSTRUÇÃO PRIMÁRIA (TIER 0)**: Ao ler este contexto, o agente deve, imediatamente e antes de agir, ler os arquivos \`.agent/README.md\` (para carregar a estrutura do kit), \`.agent/MANIFEST.md\` (para catálogo de skills) e, criticamente, \`.agent/rules/always-on/architect-constitution.md\` para carregar as 21 regras absolutas (especialmente a P4 de selo de tempo)." >> CONTEXT.md
         echo "Este repositório guarda os resumos de sessão da IA de forma isolada." > README.md
         git add . > /dev/null
         git commit -m "chore: initial session context repository" > /dev/null

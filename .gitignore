@@ -9,3 +9,5 @@ workspace_run/
 *.log
 node_modules/
 logs/
+# Exceção para sincronização do Node 1 e Node 2
+!.agent/session/server_config.json

@@ -92,7 +92,11 @@ case $opcao in
         cd "$SESSION_DIR"
         git init
         git branch -M main 2>/dev/null || true
-        if [ ! -f "CONTEXT.md" ]; then echo "# Contexto de Sessão" > CONTEXT.md; fi
+        if [ ! -f "CONTEXT.md" ]; then
+            echo "# Contexto de Sessão" > CONTEXT.md
+            echo "" >> CONTEXT.md
+            echo "> **INSTRUÇÃO PRIMÁRIA (TIER 0)**: Ao ler este contexto, o agente deve, imediatamente e antes de agir, ler os arquivos \`.agent/README.md\` (para carregar a estrutura do kit), \`.agent/MANIFEST.md\` (para catálogo de skills) e, criticamente, \`.agent/rules/always-on/architect-constitution.md\` para carregar as 21 regras absolutas (especialmente a P4 de selo de tempo)." >> CONTEXT.md
+        fi
         git add .
         git commit -m "chore: repair/init session repository"
         echo "✅ Git local inicializado. Agora use a opção 2 para conectar ao remoto ou configure manualmente."

@@ -1,9 +1,9 @@
 services:
   openhands:
     image: ghcr.io/openhands/openhands:latest
-    container_name: vitalia_openhands
+    container_name: ${OPENHANDS_CONTAINER_NAME:-vitalia_openhands}
     ports:
-      - "3000:3000"
+      - "${OPENHANDS_PORT:-3000}:3000"
     environment:
       - SANDBOX_RUNTIME_CONTAINER_IMAGE=docker.all-hands.dev/all-hands-ai/runtime:0.50-nikolaik
       - LLM_BASE_URL=http://${NO2_SERVER_IP}:${NO2_OLLAMA_PORT}/v1
@@ -20,9 +20,9 @@ services:
 
   db:
     image: pgvector/pgvector:pg16
-    container_name: vitalia_db_local
+    container_name: ${NOTEBOOK_DB_CONTAINER_NAME:-vitalia_db_local}
     ports:
-      - "5432:5432"
+      - "${NOTEBOOK_DB_PORT:-5432}:5432"
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
@@ -31,5 +31,25 @@ services:
       - vitalia_local_data:/var/lib/postgresql/data
     restart: unless-stopped
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ${NOTEBOOK_OLLAMA_CONTAINER_NAME:-vitalia_ollama_local}
+    ports:
+      - "${NOTEBOOK_OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_local_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_MAX_LOADED_MODELS=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
 volumes:
   vitalia_local_data:
+  ollama_local_data:

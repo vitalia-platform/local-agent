@@ -29,7 +29,7 @@ def consolidate(session_dir):
     if master_file.exists():
         master_content = master_file.read_text()
     else:
-        master_content = "# Contexto de Sessão Consolidado\n\n"
+        master_content = "# Contexto de Sessão Consolidado\n\n> **INSTRUÇÃO PRIMÁRIA (TIER 0)**: Ao ler este contexto, o agente deve, imediatamente e antes de agir, ler os arquivos `.agent/README.md` (para carregar a estrutura do kit), `.agent/MANIFEST.md` (para catálogo de skills) e, criticamente, `.agent/rules/always-on/architect-constitution.md` para carregar as 21 regras absolutas (especialmente a P4 de selo de tempo).\n\n"
 
     new_entries = []
     
